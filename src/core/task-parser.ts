@@ -2,6 +2,10 @@ import { ParsedTask } from "./types.js";
 
 const URL_RE = /https?:\/\/[^\s]+/gi;
 
+function normalizeDetectedUrl(raw: string): string {
+  return raw.replace(/[),.;!?，。；！？）】》]+$/g, "");
+}
+
 function detectTopN(text: string, defaultValue: number): number {
   const match = text.match(/top\s*(\d{1,3})/i) || text.match(/前\s*(\d{1,3})/i);
   if (!match) {
@@ -36,7 +40,9 @@ export function parseTasks(text: string): ParsedTask[] {
   }
 
   const tasks: ParsedTask[] = [];
-  const links = Array.from(new Set(source.match(URL_RE) || []));
+  const links = Array.from(
+    new Set((source.match(URL_RE) || []).map((v) => normalizeDetectedUrl(v)).filter(Boolean))
+  );
 
   for (const link of links) {
     tasks.push({

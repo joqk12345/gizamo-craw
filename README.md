@@ -104,6 +104,7 @@ npm run dev
 说明：
 - 模板要求“仅基于原文”，缺失信息必须标注“未提及/未发现明确内容”
 - Mermaid 图节点和连线需使用文章真实概念，不允许保留占位词
+- Mermaid 语法要求“每行一条边”；若模型输出 `A + B --> C`，系统会自动改写为 `A --> C` 与 `B --> C`
 - 概念项必须给出中英文形式（如：注意力机制 / Attention Mechanism）
 
 ## OpenClaw 风格对齐点（MVP）
@@ -169,3 +170,19 @@ npm run dev
 OPENROUTER_MODEL=stepfun/step-3.5-flash:free
 OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-chat:free
 ```
+
+## 微信公众号链接提取（mp.weixin.qq.com）
+
+已内置微信文章专用提取策略：
+
+1. 优先抽取正文容器（`#js_content` / `.rich_media_content`）
+2. 自动提取标题（`og:title` / 页面标题容器）
+3. 使用更接近浏览器的请求头与 Referer
+4. 多级回退：正文容器提取失败时，回退到通用内容抽取
+5. 识别常见风控页（如“环境异常/访问频繁”）并返回明确错误
+
+使用建议：
+
+- 发送纯净链接：`https://mp.weixin.qq.com/s/...`
+- 链接末尾即使带中文标点（如 `。`、`）`），系统也会自动清洗
+- 若仍失败，优先检查网络/代理是否可访问 `mp.weixin.qq.com`
