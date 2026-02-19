@@ -5,6 +5,7 @@
 当前版本目标：
 - 私聊 Telegram 下发任务
 - 支持链接总结、长文本总结、Hacker News 分析、OpenRouter 综合热度分析
+- 总结任务支持固定“结构化文档模板”（标题、概念、关系、FAQ、Mermaid、金句等）
 - 任务执行完后，Telegram 返回短摘要 + GitHub 详细报告链接
   - 若未配置 GitHub，则仅返回 TG 短摘要
 
@@ -83,6 +84,28 @@ npm run dev
 - 多任务
   - `任务：总结 https://x.com/... + 抓取 hn top 10 + 抓取 openrouter top 10`
 
+## 结构化总结模板（默认）
+
+`总结链接` 与 `长文本总结` 默认使用统一模板输出，主要结构如下：
+
+1. 标题
+2. 整体结构化文档表达
+3. 处理流程
+4. 概念清单（中英文）
+5. 概念定义（中英文）
+6. 概念关联与逻辑关系（中英文，含公式/逻辑表达）
+7. COT 逻辑梳理（定义/分类/比较/因果/科学方法论）
+8. 事实与看法（病毒）
+9. FAQ（原文问题整理）
+10. Visualization（Mermaid，分 subgraph）
+11. 文章中的类比
+12. 10 个金句
+
+说明：
+- 模板要求“仅基于原文”，缺失信息必须标注“未提及/未发现明确内容”
+- Mermaid 图节点和连线需使用文章真实概念，不允许保留占位词
+- 概念项必须给出中英文形式（如：注意力机制 / Attention Mechanism）
+
 ## OpenClaw 风格对齐点（MVP）
 
 - 通道与执行逻辑解耦：`ChannelAdapter` 与 `TaskRunner` 分离
@@ -139,3 +162,10 @@ npm run dev
    - `OPENROUTER_FALLBACK_MODELS=<模型1>,<模型2>`
 2. 程序会在主模型不可用时自动切换到备用模型
 3. 重启进程后重试任务
+
+可直接尝试的免费模型配置示例：
+
+```env
+OPENROUTER_MODEL=stepfun/step-3.5-flash:free
+OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-chat:free
+```
