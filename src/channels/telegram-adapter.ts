@@ -50,7 +50,18 @@ export class TelegramAdapter implements ChannelAdapter {
     onMessage: (message: IncomingMessage) => Promise<void>
   ): Promise<void> {
     this.running = true;
-    await this.validateToken();
+    try {
+      await this.validateToken();
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        throw err;
+      }
+      // Network glitches during startup should not crash the whole process.
+      // Polling loop below already has retry/backoff and will recover.
+      console.warn(
+        `[telegram] startup token check skipped due to transient error: ${redactToken(formatError(err))}`
+      );
+    }
     while (this.running) {
       try {
         const timeoutSec = this.forceShortPoll ? 0 : this.longPollTimeoutSec;
@@ -132,7 +143,17 @@ export class TelegramAdapter implements ChannelAdapter {
     if (this.transport === "curl") {
       return this.callApiByCurl<T>(method, params, timeoutMs);
     }
-    return this.callApiByFetch<T>(method, params, timeoutMs);
+    try {
+      return await this.callApiByFetch<T>(method, params, timeoutMs);
+    } catch (err) {
+      if (!isTransientNetworkError(err)) {
+        throw err;
+      }
+      console.warn(
+        `[telegram] fetch failed, fallback to curl: ${redactToken(formatError(err))}`
+      );
+      return this.callApiByCurl<T>(method, params, timeoutMs);
+    }
   }
 
   private async callApiByFetch<T>(
@@ -247,6 +268,19 @@ function formatError(err: unknown): string {
 function isUnauthorizedError(err: unknown): boolean {
   const msg = formatError(err).toLowerCase();
   return msg.includes("unauthorized");
+}
+
+function isTransientNetworkError(err: unknown): boolean {
+  const msg = formatError(err).toLowerCase();
+  return (
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("ehostunreach") ||
+    msg.includes("enotfound") ||
+    msg.includes("fetch failed") ||
+    msg.includes("socket hang up") ||
+    msg.includes("network")
+  );
 }
 
 function redactToken(input: string): string {

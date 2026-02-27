@@ -25,8 +25,14 @@ export class SignalEvaluatorAgent {
     const text = input.text.trim();
     const entities = this.entityExtraction(text);
     const theme = this.themeClassification(text);
-    const relevance = clampScore(Math.round(Math.min(100, 30 + text.length / 8 + entities.length * 4)), 0, 100);
-    const intensity = clampScore(Math.round(Math.min(100, (text.match(/!|风险|危机|突破|崩盘|禁令/gi)?.length ?? 0) * 12 + 25)), 0, 100);
+    const relevance = clampScore(
+      Math.round(Math.min(100, 35 + text.length / 8 + entities.length * 4)),
+      0,
+      100
+    );
+    const intensityHits =
+      text.match(/!|风险|危机|突破|崩盘|禁令|制裁|冲击|下调|上调|收紧|转向|波动/gi)?.length ?? 0;
+    const intensity = clampScore(Math.round(Math.min(100, intensityHits * 10 + 32)), 0, 100);
 
     return {
       signal_id: crypto.createHash("sha256").update(`${input.sourceType}:${text}`).digest("hex").slice(0, 16),
@@ -115,7 +121,7 @@ export class DialecticAgent {
     if (analyses.length < 2) return [];
     return analyses.map((current, idx) => {
       const target = analyses[(idx + 1) % analyses.length];
-      const adjustment = current.confidence > 0.7 ? -0.06 : -0.03;
+      const adjustment = current.confidence >= 0.65 ? -0.04 : current.confidence >= 0.45 ? -0.02 : -0.01;
       return {
         lens_name: current.lens_name,
         target_lens: target.lens_name,

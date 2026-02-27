@@ -1,10 +1,11 @@
 import { ChannelAdapter } from "../channels/channel-adapter.js";
 import { Reporter } from "../services/reporter.js";
-import { parseTasks } from "./task-parser.js";
+import { parseTasks, TaskParserMode } from "./task-parser.js";
 import { TaskRunner } from "./task-runner.js";
 import { IncomingMessage } from "./types.js";
 
 interface GatewayOptions {
+  agentRole: TaskParserMode;
   allowedUserIds: Set<string>;
   allowedChatIds: Set<string>;
   runner: TaskRunner;
@@ -18,6 +19,31 @@ export class Gateway {
     private readonly channel: ChannelAdapter,
     private readonly options: GatewayOptions
   ) {}
+
+  private helpLines(): string[] {
+    if (this.options.agentRole === "strategic") {
+      return [
+        "可用指令示例（Strategic Agent）：",
+        "1) 战略研究: weekly phase4 AI芯片出口限制影响",
+        "2) 战略研究：daily phase2 美债收益率上行影响",
+        "3) strategy: weekly phase3 energy transition geopolitics"
+      ];
+    }
+    return [
+      "可用指令示例（News Agent）：",
+      "1) 总结 https://example.com/article",
+      "2) 抓取 hn top 10 并分析",
+      "3) 抓取 openrouter top 10 并分析",
+      "4) 任务：总结 https://a.com + 抓取 hn top 10",
+      "5) 直接发送长文本，我会自动总结"
+    ];
+  }
+
+  private unknownTaskHint(): string {
+    return this.options.agentRole === "strategic"
+      ? "未识别到有效任务。Strategic Agent 仅接受“战略研究/strategy”类命令。"
+      : "未识别到有效任务。News Agent 仅接受新闻采编类命令。";
+  }
 
   private toPublishHint(err: unknown): string {
     const raw = err instanceof Error ? err.message : String(err);
@@ -61,24 +87,13 @@ export class Gateway {
     }
     const plain = message.text.trim();
     if (plain === "/start" || plain === "/help") {
-      await this.channel.sendMessage(
-        message.chatId,
-        [
-          "可用指令示例：",
-          "1) 总结 https://example.com/article",
-          "2) 抓取 hn top 10 并分析",
-          "3) 抓取 openrouter top 10 并分析",
-          "4) 任务：总结 https://a.com + 抓取 hn top 10",
-          "5) 直接发送长文本，我会自动总结",
-          "6) 战略研究: weekly phase4 AI芯片出口限制影响（daily/weekly/monthly + phase1~4 可选）"
-        ].join("\n")
-      );
+      await this.channel.sendMessage(message.chatId, this.helpLines().join("\n"));
       return;
     }
 
-    const tasks = parseTasks(message.text);
+    const tasks = parseTasks(message.text, this.options.agentRole);
     if (!tasks.length) {
-      await this.channel.sendMessage(message.chatId, "未识别到有效任务。");
+      await this.channel.sendMessage(message.chatId, this.unknownTaskHint());
       return;
     }
 

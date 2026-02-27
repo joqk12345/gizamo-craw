@@ -7,11 +7,17 @@ export interface RunOutput {
   title: string;
 }
 
+interface TaskRunnerOptions {
+  agentLabel?: string;
+}
+
 export class TaskRunner {
   private readonly skillMap: Map<ParsedTask["kind"], Skill>;
+  private readonly agentLabel: string;
 
-  constructor(skills: Skill[]) {
+  constructor(skills: Skill[], options: TaskRunnerOptions = {}) {
     this.skillMap = new Map(skills.map((s) => [s.kind, s]));
+    this.agentLabel = (options.agentLabel || "news").toLowerCase();
   }
 
   async run(
@@ -40,10 +46,11 @@ export class TaskRunner {
     const topLines = results
       .map((r, i) => `${i + 1}. ${r.shortSummary.replace(/\n+/g, " ").slice(0, 120)}`)
       .join("\n");
-    const shortMessage = `任务完成，共 ${results.length} 项。\n${topLines}`;
+    const shortMessage = `[${this.agentLabel}] 任务完成，共 ${results.length} 项。\n${topLines}`;
     const markdownReport = [
-      `# 任务报告`,
+      `# ${this.agentLabel.toUpperCase()} 任务报告`,
       ``,
+      `- agent: ${this.agentLabel}`,
       `- requestId: ${requestId}`,
       `- 生成时间(UTC): ${new Date().toISOString()}`,
       ``,
@@ -54,8 +61,7 @@ export class TaskRunner {
     return {
       shortMessage,
       markdownReport,
-      title: `task-${requestId}`
+      title: `${this.agentLabel}-task-${requestId}`
     };
   }
 }
-

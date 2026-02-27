@@ -11,6 +11,13 @@ export interface PersonaProfile {
   userAlias: string;
 }
 
+export interface PersonaProfileOptions {
+  workspaceDir?: string;
+  soulPath?: string;
+  identityPath?: string;
+  userPath?: string;
+}
+
 function readIfExists(filePath: string): string {
   if (!existsSync(filePath)) return "";
   return readFileSync(filePath, "utf-8").trim();
@@ -33,12 +40,24 @@ function firstMeaningfulLine(content: string): string {
   return line || "";
 }
 
-export function loadPersonaProfile(): PersonaProfile {
-  const workspaceDir = process.env.OPENCLAW_WORKSPACE || path.resolve(process.cwd(), "workspace");
+function resolvePath(input: string | undefined, baseDir: string, fallbackName: string): string {
+  if (!input) return path.join(baseDir, fallbackName);
+  return path.isAbsolute(input) ? input : path.resolve(baseDir, input);
+}
 
-  const soul = readIfExists(path.join(workspaceDir, "SOUL.md"));
-  const identity = readIfExists(path.join(workspaceDir, "IDENTITY.md"));
-  const user = readIfExists(path.join(workspaceDir, "USER.md"));
+export function loadPersonaProfile(options: PersonaProfileOptions = {}): PersonaProfile {
+  const workspaceDir =
+    options.workspaceDir ||
+    process.env.OPENCLAW_WORKSPACE ||
+    process.cwd();
+
+  const soulPath = resolvePath(options.soulPath, workspaceDir, "SOUL.md");
+  const identityPath = resolvePath(options.identityPath, workspaceDir, "IDENTITY.md");
+  const userPath = resolvePath(options.userPath, workspaceDir, "USER.md");
+
+  const soul = readIfExists(soulPath);
+  const identity = readIfExists(identityPath);
+  const user = readIfExists(userPath);
 
   const assistantName =
     pickByLabel(identity, ["name", "名称", "assistant", "角色"]) || firstMeaningfulLine(identity) || "Strategic Research Crew";

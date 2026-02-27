@@ -9,9 +9,40 @@ import { NoopReporter } from "./services/noop-reporter.js";
 import { HeartbeatService } from "./services/heartbeat.js";
 import { HackerNewsDigestSkill } from "./skills/hn-digest-skill.js";
 import { OpenRouterRankingSkill } from "./skills/openrouter-ranking-skill.js";
+import { loadPersonaProfile } from "./services/persona-profile.js";
 import { SummarizeLinkSkill } from "./skills/summarize-link-skill.js";
 import { SummarizeTextSkill } from "./skills/summarize-text-skill.js";
 import { StrategicResearchSkill } from "./skills/strategic-research-skill.js";
+import { AgentRole, TenantConfig } from "./config.js";
+
+function buildSkills(
+  tenant: TenantConfig,
+  llm: OpenRouterLLM | DisabledLLM,
+  extractor: ContentExtractor
+) {
+  const role: AgentRole = tenant.agentRole;
+  if (role === "strategic") {
+    const persona = loadPersonaProfile({
+      workspaceDir: tenant.personaWorkspaceDir,
+      soulPath: tenant.soulFile,
+      identityPath: tenant.identityFile,
+      userPath: tenant.userFile
+    });
+    return [
+      new StrategicResearchSkill(
+        persona,
+        undefined,
+        tenant.strategicInsufficientSignalThreshold
+      )
+    ];
+  }
+  return [
+    new SummarizeTextSkill(llm),
+    new SummarizeLinkSkill(extractor, llm),
+    new HackerNewsDigestSkill(llm),
+    new OpenRouterRankingSkill(llm)
+  ];
+}
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -23,40 +54,7 @@ async function main(): Promise<void> {
       )
     : new DisabledLLM();
   const extractor = new ContentExtractor();
-
-  const skills = [
-    new SummarizeTextSkill(llm),
-    new SummarizeLinkSkill(extractor, llm),
-    new HackerNewsDigestSkill(llm),
-    new OpenRouterRankingSkill(llm),
-    new StrategicResearchSkill()
-  ];
-  const runner = new TaskRunner(skills);
-  const reporter =
-    config.githubToken && config.githubRepo
-      ? new GitHubReporter(
-          config.githubToken,
-          config.githubRepo,
-          config.githubBranch,
-          config.reportBasePath
-        )
-      : new NoopReporter();
-  const telegram = new TelegramAdapter(
-    config.telegramBotToken,
-    config.pollIntervalMs,
-    config.telegramLongPollTimeoutSec,
-    config.telegramForceShortPoll,
-    config.telegramTransport
-  );
-
-  const gateway = new Gateway(telegram, {
-    allowedUserIds: config.telegramAllowedUserIds,
-    allowedChatIds: config.telegramAllowedChatIds,
-    runner,
-    reporter
-  });
-
-  console.log("[boot] gateway starting...");
+  console.log(`[boot] tenants=${config.tenants.length}`);
   if (!config.openRouterApiKey) {
     console.log("[boot] OPENROUTER_API_KEY is missing: summarize/analyze tasks will return config hint.");
   } else if (config.openRouterFallbackModels.length > 0) {
@@ -74,20 +72,60 @@ async function main(): Promise<void> {
     console.log("[boot] TELEGRAM_TRANSPORT=curl enabled.");
   }
 
-  const heartbeatTarget =
-    Array.from(config.telegramAllowedChatIds)[0] || Array.from(config.telegramAllowedUserIds)[0] || "";
-  if (config.heartbeatEnabled && heartbeatTarget) {
-    const heartbeat = new HeartbeatService(telegram, reporter, {
-      intervalMs: config.heartbeatIntervalMs,
-      rootDir: process.cwd(),
-      targetChatId: heartbeatTarget
+  const starts = config.tenants.map(async (tenant) => {
+    const skills = buildSkills(tenant, llm, extractor);
+    const runner = new TaskRunner(skills, {
+      agentLabel: `${tenant.id}/${tenant.agentRole}`
     });
-    heartbeat.start();
-    console.log(`[boot] heartbeat enabled: interval=${config.heartbeatIntervalMs}ms target=${heartbeatTarget}`);
-  } else {
-    console.log("[boot] heartbeat disabled (missing target or HEARTBEAT_ENABLED=0).");
-  }
-  await gateway.start();
+    const reporter =
+      config.githubToken && config.githubRepo
+        ? new GitHubReporter(
+            config.githubToken,
+            config.githubRepo,
+            config.githubBranch,
+            tenant.reportBasePath
+          )
+        : new NoopReporter();
+    const telegram = new TelegramAdapter(
+      tenant.telegramBotToken,
+      config.pollIntervalMs,
+      config.telegramLongPollTimeoutSec,
+      config.telegramForceShortPoll,
+      config.telegramTransport
+    );
+    const gateway = new Gateway(telegram, {
+      agentRole: tenant.agentRole,
+      allowedUserIds: tenant.telegramAllowedUserIds,
+      allowedChatIds: tenant.telegramAllowedChatIds,
+      runner,
+      reporter
+    });
+
+    console.log(
+      `[boot] tenant=${tenant.id} role=${tenant.agentRole} reportBasePath=${tenant.reportBasePath} threshold=${tenant.strategicInsufficientSignalThreshold ?? "default"}`
+    );
+
+    const heartbeatTarget =
+      Array.from(tenant.telegramAllowedChatIds)[0] ||
+      Array.from(tenant.telegramAllowedUserIds)[0] ||
+      "";
+    if (config.heartbeatEnabled && heartbeatTarget) {
+      const heartbeat = new HeartbeatService(telegram, reporter, {
+        intervalMs: config.heartbeatIntervalMs,
+        rootDir: process.cwd(),
+        targetChatId: heartbeatTarget
+      });
+      heartbeat.start();
+      console.log(
+        `[boot] heartbeat enabled: tenant=${tenant.id} interval=${config.heartbeatIntervalMs}ms target=${heartbeatTarget}`
+      );
+    } else {
+      console.log(`[boot] heartbeat disabled: tenant=${tenant.id} (missing target or HEARTBEAT_ENABLED=0).`);
+    }
+
+    await gateway.start();
+  });
+  await Promise.all(starts);
 }
 
 main().catch((err) => {

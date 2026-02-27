@@ -1,5 +1,7 @@
 import { ParsedTask } from "./types.js";
 
+export type TaskParserMode = "news" | "strategic";
+
 const URL_RE = /https?:\/\/[^\s]+/gi;
 
 function normalizeDetectedUrl(raw: string): string {
@@ -59,7 +61,7 @@ function stripControlText(input: string): string {
     .trim();
 }
 
-export function parseTasks(text: string): ParsedTask[] {
+export function parseTasks(text: string, mode: TaskParserMode = "news"): ParsedTask[] {
   const source = text.trim();
   if (!source) {
     return [];
@@ -69,8 +71,11 @@ export function parseTasks(text: string): ParsedTask[] {
   }
 
   const strategicTask = parseStrategicResearchTask(source);
+  if (mode === "strategic") {
+    return strategicTask ? [strategicTask] : [];
+  }
   if (strategicTask) {
-    return [strategicTask];
+    return [];
   }
 
   const tasks: ParsedTask[] = [];

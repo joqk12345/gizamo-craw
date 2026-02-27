@@ -9,8 +9,9 @@ export class StrategicResearchSkill implements Skill {
   readonly kind = "strategic_research" as const;
 
   constructor(
-    private readonly persona: PersonaProfile = loadPersonaProfile(),
-    private readonly memoryJournal: StrategicMemoryJournal = new StrategicMemoryJournal()
+    private readonly persona: PersonaProfile = loadPersonaProfile({}),
+    private readonly memoryJournal: StrategicMemoryJournal = new StrategicMemoryJournal(),
+    private readonly insufficientSignalThreshold = 0.35
   ) {}
 
   async run(task: ParsedTask, ctx: TaskContext): Promise<SkillResult> {
@@ -26,7 +27,7 @@ export class StrategicResearchSkill implements Skill {
     const orchestrator = new StrategicResearchOrchestrator({
       cadence,
       phase,
-      insufficientSignalThreshold: 0.4
+      insufficientSignalThreshold: this.insufficientSignalThreshold
     });
 
     const result = await orchestrator.run({ text, sourceType });

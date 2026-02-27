@@ -2,9 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 export interface AppConfig {
-  telegramBotToken: string;
-  telegramAllowedUserIds: Set<string>;
-  telegramAllowedChatIds: Set<string>;
+  tenants: TenantConfig[];
   telegramLongPollTimeoutSec: number;
   telegramForceShortPoll: boolean;
   telegramTransport: "fetch" | "curl";
@@ -15,11 +13,25 @@ export interface AppConfig {
   githubRepo?: string;
   githubBranch: string;
   pollIntervalMs: number;
-  reportBasePath: string;
   heartbeatEnabled: boolean;
   heartbeatIntervalMs: number;
 }
 
+export type AgentRole = "news" | "strategic";
+
+export interface TenantConfig {
+  id: string;
+  agentRole: AgentRole;
+  telegramBotToken: string;
+  telegramAllowedUserIds: Set<string>;
+  telegramAllowedChatIds: Set<string>;
+  reportBasePath: string;
+  strategicInsufficientSignalThreshold?: number;
+  personaWorkspaceDir?: string;
+  soulFile?: string;
+  identityFile?: string;
+  userFile?: string;
+}
 
 function firstEnv(...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -59,14 +71,6 @@ function loadEnvFile(): void {
   }
 }
 
-function must(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return value;
-}
-
 function toBool(raw: string | undefined, fallback = false): boolean {
   if (raw === undefined) {
     return fallback;
@@ -90,30 +94,142 @@ function normalizeTelegramBotToken(raw: string): string {
   return trimmed.replace(/^bot/i, "").split(/\s+#/)[0].trim();
 }
 
-export function loadConfig(): AppConfig {
-  loadEnvFile();
-  const allowedUserRaw =
-    process.env.TELEGRAM_ALLOWED_USER_IDS || process.env.TELEGRAM_ALLOWED_USER_ID;
-  const allowedUsers = (allowedUserRaw || "")
+function splitCsv(raw: string | undefined): string[] {
+  return (raw || "")
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
-  const allowedChatRaw =
-    process.env.TELEGRAM_ALLOWED_CHAT_IDS || process.env.TELEGRAM_ALLOWED_CHAT_ID;
-  const allowedChats = (allowedChatRaw || "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  if (!allowedUsers.length && !allowedChats.length) {
+}
+
+function parseAgentRole(raw: string | undefined): AgentRole {
+  const normalized = (raw || "news").trim().toLowerCase();
+  return normalized === "strategic" ? "strategic" : "news";
+}
+
+function parseThreshold(raw: string | undefined): number | undefined {
+  if (!raw) return undefined;
+  const value = Number(raw);
+  if (Number.isNaN(value)) return undefined;
+  return clamp(value, 0.1, 0.9);
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+function normalizeTenantId(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-");
+}
+
+function parseTenantIds(): string[] {
+  const raw = firstEnv("AGENT_TENANTS", "TENANTS");
+  if (raw) {
+    const fromList = splitCsv(raw)
+      .map((id) => normalizeTenantId(id))
+      .filter(Boolean);
+    if (fromList.length) {
+      return Array.from(new Set(fromList));
+    }
+  }
+  const fallbackRole = parseAgentRole(process.env.AGENT_ROLE);
+  return [fallbackRole];
+}
+
+function loadTenantConfig(tenantId: string, defaultReportRoot: string): TenantConfig {
+  const prefix = tenantId.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const role = parseAgentRole(firstEnv(`${prefix}_AGENT_ROLE`));
+
+  const token = firstEnv(
+    `${prefix}_TELEGRAM_BOT_TOKEN`,
+    role === "strategic" ? "STRATEGIC_TELEGRAM_BOT_TOKEN" : "NEWS_TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_BOT_TOKEN"
+  );
+  if (!token) {
     throw new Error(
-      "Missing allowlist: set TELEGRAM_ALLOWED_USER_ID(S) or TELEGRAM_ALLOWED_CHAT_ID(S)"
+      `Missing bot token for tenant "${tenantId}": set ${prefix}_TELEGRAM_BOT_TOKEN`
     );
   }
 
+  const allowedUsers = splitCsv(
+    firstEnv(
+      `${prefix}_TELEGRAM_ALLOWED_USER_IDS`,
+      `${prefix}_TELEGRAM_ALLOWED_USER_ID`,
+      role === "strategic"
+        ? "STRATEGIC_TELEGRAM_ALLOWED_USER_IDS"
+        : "NEWS_TELEGRAM_ALLOWED_USER_IDS",
+      role === "strategic"
+        ? "STRATEGIC_TELEGRAM_ALLOWED_USER_ID"
+        : "NEWS_TELEGRAM_ALLOWED_USER_ID",
+      "TELEGRAM_ALLOWED_USER_IDS",
+      "TELEGRAM_ALLOWED_USER_ID"
+    )
+  );
+  const allowedChats = splitCsv(
+    firstEnv(
+      `${prefix}_TELEGRAM_ALLOWED_CHAT_IDS`,
+      `${prefix}_TELEGRAM_ALLOWED_CHAT_ID`,
+      role === "strategic"
+        ? "STRATEGIC_TELEGRAM_ALLOWED_CHAT_IDS"
+        : "NEWS_TELEGRAM_ALLOWED_CHAT_IDS",
+      role === "strategic"
+        ? "STRATEGIC_TELEGRAM_ALLOWED_CHAT_ID"
+        : "NEWS_TELEGRAM_ALLOWED_CHAT_ID",
+      "TELEGRAM_ALLOWED_CHAT_IDS",
+      "TELEGRAM_ALLOWED_CHAT_ID"
+    )
+  );
+  if (!allowedUsers.length && !allowedChats.length) {
+    throw new Error(
+      `Missing allowlist for tenant "${tenantId}": set ${prefix}_TELEGRAM_ALLOWED_USER_IDS or ${prefix}_TELEGRAM_ALLOWED_CHAT_IDS`
+    );
+  }
+
+  const explicitReportPath = firstEnv(`${prefix}_REPORT_BASE_PATH`);
+  const reportBasePath = explicitReportPath || `${defaultReportRoot}/${tenantId}`;
+  const strategicInsufficientSignalThreshold =
+    role === "strategic"
+      ? parseThreshold(
+          firstEnv(
+            `${prefix}_STRATEGIC_INSUFFICIENT_SIGNAL_THRESHOLD`,
+            "STRATEGIC_INSUFFICIENT_SIGNAL_THRESHOLD"
+          )
+        )
+      : undefined;
+  const personaWorkspaceDir = firstEnv(
+    `${prefix}_PERSONA_WORKSPACE`,
+    "OPENCLAW_WORKSPACE"
+  );
+  const soulFile = firstEnv(`${prefix}_SOUL_FILE`);
+  const identityFile = firstEnv(`${prefix}_IDENTITY_FILE`);
+  const userFile = firstEnv(`${prefix}_USER_FILE`);
+
   return {
-    telegramBotToken: normalizeTelegramBotToken(must("TELEGRAM_BOT_TOKEN")),
+    id: tenantId,
+    agentRole: role,
+    telegramBotToken: normalizeTelegramBotToken(token),
     telegramAllowedUserIds: new Set(allowedUsers),
     telegramAllowedChatIds: new Set(allowedChats),
+    reportBasePath,
+    strategicInsufficientSignalThreshold,
+    personaWorkspaceDir,
+    soulFile,
+    identityFile,
+    userFile
+  };
+}
+
+export function loadConfig(): AppConfig {
+  loadEnvFile();
+  const tenantIds = parseTenantIds();
+  const defaultReportRoot =
+    firstEnv("REPORT_BASE_PATH", "report_BASE_PATH", "report_base_path") ||
+    "reports";
+  const tenants = tenantIds.map((tenantId) =>
+    loadTenantConfig(tenantId, defaultReportRoot)
+  );
+
+  return {
+    tenants,
     telegramLongPollTimeoutSec: Number(
       process.env.TELEGRAM_LONG_POLL_TIMEOUT_SEC || "10"
     ),
@@ -147,9 +263,6 @@ export function loadConfig(): AppConfig {
     githubBranch:
       firstEnv("GITHUB_BRANCH", "github_BRANCH", "github_branch") || "main",
     pollIntervalMs: Number(process.env.POLL_INTERVAL_MS || "1500"),
-    reportBasePath:
-      firstEnv("REPORT_BASE_PATH", "report_BASE_PATH", "report_base_path") ||
-      "reports",
     heartbeatEnabled: toBool(process.env.HEARTBEAT_ENABLED, true),
     heartbeatIntervalMs: Number(process.env.HEARTBEAT_INTERVAL_MS || "1800000")
   };
