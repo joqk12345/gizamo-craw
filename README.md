@@ -33,42 +33,127 @@ Telegram(private chat)
 
 ## 两个 Feature 的流程差异（Mermaid）
 
-### Flow A: News Editer Agent
+### Flow A: News Editer Agent（风格化）
 
 ```mermaid
 flowchart TD
-  U[TG 用户消息] --> G[Gateway]
-  G --> P[Task Parser]
-  P --> T[TaskRunner]
-  T --> S1[Summarize Text/Link Skill]
-  T --> S2[HN Digest Skill]
-  T --> S3[OpenRouter Ranking Skill]
-  S1 --> R[Markdown Report]
-  S2 --> R
-  S3 --> R
-  R --> GH[GitHubReporter 发布]
-  GH --> TG[TG 返回摘要 + 报告链接]
+    %% 样式定义
+    classDef ext fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#212529
+    classDef gw fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#0d47a1
+    classDef eng fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
+
+    %% 外部层
+    subgraph External["🌐 外部终端"]
+        TG["📱 Telegram"]:::ext
+        GH["🐙 GitHub"]:::ext
+    end
+
+    %% 入口层
+    subgraph Entry["🚪 入口与网关"]
+        GW["Gateway"]:::gw
+        Parser["TaskParser"]:::gw
+        TR["TaskRunner"]:::gw
+        Rep["GitHubReporter"]:::gw
+
+        GW --> Parser
+        Parser --> TR
+        TR --> Rep
+    end
+
+    %% 执行层
+    subgraph Engine["📰 News Skills"]
+        S1["Summarize Text/Link"]:::eng
+        S2["HN Digest"]:::eng
+        S3["OpenRouter Ranking"]:::eng
+
+        TR --> S1
+        TR --> S2
+        TR --> S3
+        S1 --> TR
+        S2 --> TR
+        S3 --> TR
+    end
+
+    %% 跨层连线
+    TG -->|"发送指令"| GW
+    Rep -->|"发布 Markdown"| GH
+    Rep -->|"回发链接"| TG
 ```
 
-### Flow B: Strategic Research Crew
+### Flow B: Strategic Research Crew（风格化）
 
 ```mermaid
 flowchart TD
-  U[TG 战略研究指令] --> G[Gateway]
-  G --> P[Task Parser strategic_research]
-  P --> SR[StrategicResearchSkill]
-  SR --> O[StrategicResearchOrchestrator]
-  O --> SI[Signal Intake]
-  SI --> LS[Lens Selection]
-  LS --> LA[Parallel Lens Analysis]
-  LA --> D[Dialectic]
-  D --> SY[Synthesis]
-  SY --> ED[Editorial Governance]
-  ED --> MJ[StrategicMemoryJournal]
-  MJ --> M[(MEMORY.md + memory/*)]
-  ED --> RR[结构化完整报告]
-  RR --> GH[GitHubReporter 发布]
-  GH --> TG[TG 返回摘要 + 报告链接]
+    %% 样式定义
+    classDef ext fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#212529
+    classDef gw fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#0d47a1
+    classDef eng fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
+    classDef ctx fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,color:#1b5e20
+
+    %% 外部层
+    subgraph External["🌐 外部终端"]
+        TG["📱 Telegram"]:::ext
+        GH["🐙 GitHub"]:::ext
+    end
+
+    %% 主动层
+    subgraph Proactive["⏰ 主动服务"]
+        HB["Heartbeat Service"]
+        HBConf["读取 HEARTBEAT.md"]
+        Exec["内置执行器"]
+        HB --> HBConf
+        HB -->|"调度执行"| Exec
+    end
+
+    %% 入口层
+    subgraph Entry["🚪 入口与网关"]
+        GW["Gateway"]:::gw
+        Parser["TaskParser"]:::gw
+        TR["TaskRunner"]:::gw
+        Rep["GitHubReporter"]:::gw
+
+        GW --> Parser
+        Parser --> TR
+        TR --> Rep
+    end
+
+    %% 引擎层
+    subgraph Engine["🧠 核心引擎"]
+        S1["1. 信号摄入"]:::eng
+        S2["2. 视角选择"]:::eng
+        S3["3. 视角分析"]:::eng
+        S4["4. 辩证互评"]:::eng
+        S5["5. 综合摘要"]:::eng
+        S6["6. 编校合规"]:::eng
+
+        S1 --> S2
+        S2 --> S3
+        S3 --> S4
+        S4 --> S5
+        S5 --> S6
+    end
+
+    %% 配置与记忆
+    subgraph Context["💾 记忆与配置"]
+        Persona["Persona Profile"]:::ctx
+        Skill["Skill Template"]:::ctx
+        MemRun["运行时 Memory"]:::ctx
+        MemFile["文件化 Journal"]:::ctx
+    end
+
+    %% 跨层连线
+    TG -->|"发送指令"| GW
+    Exec -->|"生成主动任务"| TR
+    TR -->|"触发核心引擎"| S1
+    S6 -->|"返回报告段落"| TR
+    Rep -->|"发布Markdown"| GH
+    Rep -->|"回发链接"| TG
+
+    %% 外部上下文交互
+    Persona -.->|"配置注入"| S1
+    Skill -.->|"规则加载"| S1
+    S4 <-->|"状态读写"| MemRun
+    S6 -->|"持久化保存"| MemFile
 ```
 
 ### 关键差异总结
