@@ -186,3 +186,109 @@ OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-cha
 - 发送纯净链接：`https://mp.weixin.qq.com/s/...`
 - 链接末尾即使带中文标点（如 `。`、`）`），系统也会自动清洗
 - 若仍失败，优先检查网络/代理是否可访问 `mp.weixin.qq.com`
+
+## Strategic Research Crew (Spec v1.0)
+
+仓库已新增 `src/strategic/` 目录，实现基于状态机的多层战略研究引擎：
+
+- `Signal Intake`：信号结构化、打分与存储
+- `Lens Selection`：Theme→Lens 规则候选 + 动态收窄
+- `Parallel Lens Analysis`：多镜头并行分析（结构化输出）
+- `Dialectic`：单轮结构化互评（含置信度调整）
+- `Synthesis`：基准/替代情景与监控信号
+- `Editorial Governance`：一轮审校与一次修订控制
+- `Memory Stores`：Signal / Theme Cluster / Thesis / Lens Performance 四类存储
+- `Cadence`：daily / weekly / monthly 模式
+
+### 快速调用示例
+
+```ts
+import { StrategicResearchOrchestrator } from "./strategic/index.js";
+
+const orchestrator = new StrategicResearchOrchestrator({
+  cadence: "weekly",
+  phase: "phase4",
+  insufficientSignalThreshold: 0.4
+});
+
+const result = await orchestrator.run({
+  text: "某国发布新的先进芯片出口管制草案，相关供应链与资本市场快速波动。",
+  sourceType: "news"
+});
+```
+
+说明：
+
+- `phase1` 仅执行 Layer 1~3（Dialectic/Synthesis 使用 stub）
+- `phase2` 增加 Dialectic + Synthesis
+- `phase3` 增加 Editorial Governance + Memory Stores
+- `phase4` 增加 Cadence 控制（完整流）
+
+### How to Use it via TG
+
+发送以下格式即可触发战略研究流程：
+
+- `战略研究: weekly phase4 AI芯片出口限制影响全球供应链`
+- `战略: daily phase1 某平台发布新模型引发开发者迁移`
+- `strategy: monthly phase4 central bank policy shift and liquidity shock`
+
+参数说明：
+
+- cadence：`daily` / `weekly` / `monthly`（默认 `weekly`）
+- phase：`phase1` / `phase2` / `phase3` / `phase4`（默认 `phase4`）
+- 正文：其余文本会作为 signal 输入
+
+返回结果：
+
+- TG 短消息会返回 base/alternative/confidence 摘要
+- 若配置了 GitHub 报告发布，会附带完整结构化报告链接
+
+### Strategic Research Crew 个性化风格（SOUL / IDENTITY / USER）
+
+可在 OpenClaw workspace 目录放置以下文件来自定义战略研究回复风格：
+
+- `SOUL.md`：沟通风格与工作方式（如“直接切入主题”“允许表达观点”“简洁优先”）
+- `IDENTITY.md`：助手名称与符号标识
+- `USER.md`：用户称呼/时区/背景等偏好
+
+默认读取路径：`<项目根目录>/workspace`。
+也可通过环境变量指定：
+
+```env
+OPENCLAW_WORKSPACE=/path/to/openclaw/workspace
+```
+
+当你通过 TG 发送战略研究任务时（如 `战略研究: weekly phase4 ...`），系统会自动加载上述文件，并把风格应用到：
+
+- TG 短摘要语气（更直接/更简洁）
+- 报告中的叙事总结（Narrative Summary）
+- 是否附带“观点”段落（由 SOUL.md 规则控制）
+
+如果三个文件为空或不存在，会回退到默认中性风格。
+
+### Strategic Memory MVP（参考 OpenClaw）
+
+Strategic Research Crew 已接入一版文件型记忆系统（MVP），每次执行 `strategic_research` 都会写入：
+
+```text
+MEMORY.md
+memory/
+  ├── projects.md
+  ├── infra.md
+  ├── lessons.md
+  └── YYYY-MM-DD.md
+```
+
+说明：
+
+- `MEMORY.md`：核心索引，只保留最新关键信息与文件引用
+- `memory/projects.md`：按请求记录主题、镜头、状态与摘要
+- `memory/infra.md`：运行时快照（store 规模、更新时间）
+- `memory/lessons.md`：不确定性、监控信号、互评要点沉淀
+- `memory/YYYY-MM-DD.md`：按日完整执行日志
+
+默认写入项目根目录；可通过环境变量覆盖：
+
+```env
+STRATEGIC_MEMORY_DIR=/path/to/dir
+```
