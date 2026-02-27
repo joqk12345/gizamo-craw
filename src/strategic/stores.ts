@@ -62,6 +62,10 @@ export class ThemeClusterStore {
     return this.clusters.get(theme);
   }
 
+  all(): ThemeCluster[] {
+    return Array.from(this.clusters.values());
+  }
+
   private computeTrend(series: number[]): "up" | "flat" | "down" {
     if (series.length < 2) return "flat";
     const last = series[series.length - 1];
@@ -81,6 +85,10 @@ export class StrategicThesisStore {
 
   get(thesisId: string): ThesisRecord | undefined {
     return this.records.get(thesisId);
+  }
+
+  all(): ThesisRecord[] {
+    return Array.from(this.records.values());
   }
 }
 

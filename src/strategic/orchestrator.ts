@@ -185,6 +185,21 @@ export class StrategicResearchOrchestrator {
     };
   }
 
+
+  getMemorySnapshot(): {
+    signals: ReturnType<StrategicMemoryStores["signalStore"]["all"]>;
+    themeClusters: ReturnType<StrategicMemoryStores["themeClusterStore"]["all"]>;
+    theses: ReturnType<StrategicMemoryStores["strategicThesisStore"]["all"]>;
+    lensPerformance: ReturnType<StrategicMemoryStores["lensPerformanceStore"]["all"]>;
+  } {
+    return {
+      signals: this.stores.signalStore.all(),
+      themeClusters: this.stores.themeClusterStore.all(),
+      theses: this.stores.strategicThesisStore.all(),
+      lensPerformance: this.stores.lensPerformanceStore.all()
+    };
+  }
+
   private runDialectic(analyses: LensAnalysis[]): DialecticCritique[] {
     const critiques = this.dialectic.critique(analyses);
     for (const critique of critiques) {

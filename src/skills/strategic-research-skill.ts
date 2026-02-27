@@ -3,13 +3,17 @@ import { Skill } from "./skill.js";
 import { StrategicResearchOrchestrator } from "../strategic/orchestrator.js";
 import { CadenceMode, ExecutionPhase } from "../strategic/types.js";
 import { hasRule, loadPersonaProfile, PersonaProfile } from "../services/persona-profile.js";
+import { StrategicMemoryJournal } from "../strategic/memory-journal.js";
 
 export class StrategicResearchSkill implements Skill {
   readonly kind = "strategic_research" as const;
 
-  constructor(private readonly persona: PersonaProfile = loadPersonaProfile()) {}
+  constructor(
+    private readonly persona: PersonaProfile = loadPersonaProfile(),
+    private readonly memoryJournal: StrategicMemoryJournal = new StrategicMemoryJournal()
+  ) {}
 
-  async run(task: ParsedTask, _ctx: TaskContext): Promise<SkillResult> {
+  async run(task: ParsedTask, ctx: TaskContext): Promise<SkillResult> {
     const text = String(task.payload.text || "").trim();
     if (!text) {
       throw new Error("战略研究任务缺少文本输入。示例：战略研究: weekly phase4 AI芯片出口限制影响");
@@ -26,6 +30,13 @@ export class StrategicResearchSkill implements Skill {
     });
 
     const result = await orchestrator.run({ text, sourceType });
+    this.memoryJournal.persist({
+      requestId: ctx.requestId,
+      cadence,
+      phase,
+      result,
+      snapshot: orchestrator.getMemorySnapshot()
+    });
     const speaker = `${this.persona.assistantSymbol} ${this.persona.assistantName}`;
 
     if (result.insufficientBrief) {

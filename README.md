@@ -265,3 +265,30 @@ OPENCLAW_WORKSPACE=/path/to/openclaw/workspace
 - 是否附带“观点”段落（由 SOUL.md 规则控制）
 
 如果三个文件为空或不存在，会回退到默认中性风格。
+
+### Strategic Memory MVP（参考 OpenClaw）
+
+Strategic Research Crew 已接入一版文件型记忆系统（MVP），每次执行 `strategic_research` 都会写入：
+
+```text
+MEMORY.md
+memory/
+  ├── projects.md
+  ├── infra.md
+  ├── lessons.md
+  └── YYYY-MM-DD.md
+```
+
+说明：
+
+- `MEMORY.md`：核心索引，只保留最新关键信息与文件引用
+- `memory/projects.md`：按请求记录主题、镜头、状态与摘要
+- `memory/infra.md`：运行时快照（store 规模、更新时间）
+- `memory/lessons.md`：不确定性、监控信号、互评要点沉淀
+- `memory/YYYY-MM-DD.md`：按日完整执行日志
+
+默认写入项目根目录；可通过环境变量覆盖：
+
+```env
+STRATEGIC_MEMORY_DIR=/path/to/dir
+```
