@@ -1,4 +1,13 @@
-# News Editer Agent (MVP)
+# Product Overview
+
+本仓库当前包含两个并行、同级能力模块：
+
+1. **News Editer Agent (MVP)**：新闻采编与结构化总结
+2. **Strategic Research Crew (Spec v1.0)**：多镜头战略研究与情景推演
+
+二者共享同一套 Telegram/GitHub 基础设施，但处理流程与输出目标不同。
+
+## Feature A — News Editer Agent (MVP)
 
 面向“数字员工”场景的新闻采编 Agent。
 
@@ -21,6 +30,52 @@ Telegram(private chat)
 ```
 
 后续接入飞书时，只需要新增一个 `ChannelAdapter` 实现并接入 `Gateway`。
+
+## 两个 Feature 的流程差异（Mermaid）
+
+### Flow A: News Editer Agent
+
+```mermaid
+flowchart TD
+  U[TG 用户消息] --> G[Gateway]
+  G --> P[Task Parser]
+  P --> T[TaskRunner]
+  T --> S1[Summarize Text/Link Skill]
+  T --> S2[HN Digest Skill]
+  T --> S3[OpenRouter Ranking Skill]
+  S1 --> R[Markdown Report]
+  S2 --> R
+  S3 --> R
+  R --> GH[GitHubReporter 发布]
+  GH --> TG[TG 返回摘要 + 报告链接]
+```
+
+### Flow B: Strategic Research Crew
+
+```mermaid
+flowchart TD
+  U[TG 战略研究指令] --> G[Gateway]
+  G --> P[Task Parser strategic_research]
+  P --> SR[StrategicResearchSkill]
+  SR --> O[StrategicResearchOrchestrator]
+  O --> SI[Signal Intake]
+  SI --> LS[Lens Selection]
+  LS --> LA[Parallel Lens Analysis]
+  LA --> D[Dialectic]
+  D --> SY[Synthesis]
+  SY --> ED[Editorial Governance]
+  ED --> MJ[StrategicMemoryJournal]
+  MJ --> M[(MEMORY.md + memory/*)]
+  ED --> RR[结构化完整报告]
+  RR --> GH[GitHubReporter 发布]
+  GH --> TG[TG 返回摘要 + 报告链接]
+```
+
+### 关键差异总结
+
+- **News Editer Agent**：偏内容采编与总结（单任务/组合任务），输出以编辑报告为主。
+- **Strategic Research Crew**：偏状态机分析与情景推演，包含镜头分析、互评、记忆落盘与审校。
+- 两者都可发布到 GitHub，但 Strategic 输出是“战略结构化完整报告”，并写入长期记忆文件。
 
 ## 新增渠道（如飞书）
 
@@ -187,7 +242,7 @@ OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-cha
 - 链接末尾即使带中文标点（如 `。`、`）`），系统也会自动清洗
 - 若仍失败，优先检查网络/代理是否可访问 `mp.weixin.qq.com`
 
-## Strategic Research Crew (Spec v1.0)
+## Feature B — Strategic Research Crew (Spec v1.0)
 
 仓库已新增 `src/strategic/` 目录，实现基于状态机的多层战略研究引擎：
 
