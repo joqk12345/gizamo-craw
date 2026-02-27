@@ -242,3 +242,26 @@ const result = await orchestrator.run({
 
 - TG 短消息会返回 base/alternative/confidence 摘要
 - 若配置了 GitHub 报告发布，会附带完整结构化报告链接
+
+### Strategic Research Crew 个性化风格（SOUL / IDENTITY / USER）
+
+可在 OpenClaw workspace 目录放置以下文件来自定义战略研究回复风格：
+
+- `SOUL.md`：沟通风格与工作方式（如“直接切入主题”“允许表达观点”“简洁优先”）
+- `IDENTITY.md`：助手名称与符号标识
+- `USER.md`：用户称呼/时区/背景等偏好
+
+默认读取路径：`<项目根目录>/workspace`。
+也可通过环境变量指定：
+
+```env
+OPENCLAW_WORKSPACE=/path/to/openclaw/workspace
+```
+
+当你通过 TG 发送战略研究任务时（如 `战略研究: weekly phase4 ...`），系统会自动加载上述文件，并把风格应用到：
+
+- TG 短摘要语气（更直接/更简洁）
+- 报告中的叙事总结（Narrative Summary）
+- 是否附带“观点”段落（由 SOUL.md 规则控制）
+
+如果三个文件为空或不存在，会回退到默认中性风格。
