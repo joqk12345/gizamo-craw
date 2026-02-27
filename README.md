@@ -5,7 +5,7 @@
 1. **News Editer Agent (MVP)**：新闻采编与结构化总结
 2. **Strategic Research Crew (Spec v1.0)**：多镜头战略研究与情景推演
 
-二者共享同一套 Telegram/GitHub 基础设施，但处理流程与输出目标不同。
+二者建议使用独立 bot 与独立命令集运行，避免互相干扰；处理流程与输出目标也保持分离。
 
 ## Feature A — News Editer Agent (MVP)
 
@@ -30,6 +30,44 @@ Telegram(private chat)
 ```
 
 后续接入飞书时，只需要新增一个 `ChannelAdapter` 实现并接入 `Gateway`。
+
+## 多租户 Gateway 概念（OpenClaw 风格）
+
+在本项目里：
+
+- `tenant` = 一个独立 bot 的工作空间（独立 token / 白名单 / 命令路由 / 报告路径）
+- `gateway` = 该 tenant 的消息入口与调度边界
+
+当前实现不是“一个大 gateway 管所有租户”，而是“单进程内并行多个 gateway 实例”，每个 tenant 一套：
+
+- `TelegramAdapter`
+- `Gateway`
+- `TaskRunner`
+- `Reporter`
+
+这样实现的效果是：共享代码，不共享运行态身份和租户数据边界。
+
+```mermaid
+flowchart LR
+    subgraph P["Single Process"]
+        subgraph T1["Tenant: news"]
+            A1["TelegramAdapter(news token)"] --> G1["Gateway(news allowlist + parser)"]
+            G1 --> R1["TaskRunner(news skills)"]
+            R1 --> O1["Reporter(reports/news)"]
+            R1 --> M1["Reply to news bot"]
+        end
+
+        subgraph T2["Tenant: strategic"]
+            A2["TelegramAdapter(strategic token)"] --> G2["Gateway(strategic allowlist + parser)"]
+            G2 --> R2["TaskRunner(strategic skills)"]
+            R2 --> O2["Reporter(reports/strategic)"]
+            R2 --> M2["Reply to strategic bot"]
+        end
+    end
+
+    U1["User A"] --> A1
+    U2["User B"] --> A2
+```
 
 ## 两个 Feature 的流程差异（Mermaid）
 
@@ -186,7 +224,16 @@ cp .env.example .env
 
 3. 填写 `.env`
 
-- `TELEGRAM_BOT_TOKEN`: Telegram Bot token
+- `AGENT_TENANTS`: 逗号分隔的租户列表（如 `news,strategic`），单进程会并行启动多个 Agent
+- `<TENANT>_AGENT_ROLE`: 每个租户的能力角色（`news` 或 `strategic`）
+- `<TENANT>_TELEGRAM_BOT_TOKEN`: 每个租户独立 bot token（例如 `NEWS_TELEGRAM_BOT_TOKEN`）
+- `<TENANT>_TELEGRAM_ALLOWED_USER_IDS` / `<TENANT>_TELEGRAM_ALLOWED_CHAT_IDS`: 每个租户独立白名单
+- `<TENANT>_REPORT_BASE_PATH`: 每个租户独立报告目录（不配则默认 `reports/<tenant>`）
+- `<TENANT>_STRATEGIC_INSUFFICIENT_SIGNAL_THRESHOLD`: strategic 租户的置信度阈值（默认 `0.35`）
+- `<TENANT>_PERSONA_WORKSPACE`: persona 文件根目录（默认当前项目目录）
+- `<TENANT>_SOUL_FILE` / `<TENANT>_IDENTITY_FILE` / `<TENANT>_USER_FILE`: 指定该租户使用的 persona 文件
+
+- `TELEGRAM_BOT_TOKEN`: Telegram Bot token（兼容兜底，不推荐共享给两个 Agent）
   - 支持填写纯 token 或 `bot<token>`，程序会自动清洗
 - `TELEGRAM_ALLOWED_USER_ID`: 单个允许用户 ID
 - `TELEGRAM_ALLOWED_USER_IDS`: 多个允许用户 ID（逗号分隔）
@@ -212,6 +259,11 @@ npm run dev
 ```
 
 ## 指令示例
+
+按租户运行后，命令按租户角色严格隔离：
+
+- `<TENANT>_AGENT_ROLE=news`：该租户只接受新闻采编命令（总结链接/文本、HN、OpenRouter）
+- `<TENANT>_AGENT_ROLE=strategic`：该租户只接受 `战略研究/战略/strategy` 命令
 
 - 链接总结
   - `总结 https://example.com/article`
@@ -257,7 +309,7 @@ npm run dev
 ## 已知限制
 
 - OpenRouter “热度”暂无官方分值接口，当前以 API 返回顺序作为热度近似参考
-- 当前是单进程内队列；生产环境建议切到 Redis/BullMQ
+- 当前支持单进程多租户并行运行；单租户内部仍是顺序队列。生产环境建议切到 Redis/BullMQ
 - Telegram 使用 long polling；生产可迁移 webhook
 
 ## 网络排障（Telegram 连接报 ECONNRESET）
@@ -277,7 +329,7 @@ npm run dev
 
 如果出现 `Unauthorized`：
 
-1. 在 BotFather 重新生成 token 后，必须把 `.env` 里的 `TELEGRAM_BOT_TOKEN` 一并更新
+1. 在 BotFather 重新生成 token 后，必须更新对应租户的 `<TENANT>_TELEGRAM_BOT_TOKEN`（例如 `NEWS_TELEGRAM_BOT_TOKEN`）
 2. 关闭并重启进程（确保读取最新 `.env`）
 3. 用同一个 token 验证：
    - `curl "https://api.telegram.org/bot<token>/getMe"`
