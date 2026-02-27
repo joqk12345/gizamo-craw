@@ -6,10 +6,12 @@ import { ContentExtractor } from "./services/content-extractor.js";
 import { GitHubReporter } from "./services/github-reporter.js";
 import { DisabledLLM, OpenRouterLLM } from "./services/llm.js";
 import { NoopReporter } from "./services/noop-reporter.js";
+import { HeartbeatService } from "./services/heartbeat.js";
 import { HackerNewsDigestSkill } from "./skills/hn-digest-skill.js";
 import { OpenRouterRankingSkill } from "./skills/openrouter-ranking-skill.js";
 import { SummarizeLinkSkill } from "./skills/summarize-link-skill.js";
 import { SummarizeTextSkill } from "./skills/summarize-text-skill.js";
+import { StrategicResearchSkill } from "./skills/strategic-research-skill.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -26,7 +28,8 @@ async function main(): Promise<void> {
     new SummarizeTextSkill(llm),
     new SummarizeLinkSkill(extractor, llm),
     new HackerNewsDigestSkill(llm),
-    new OpenRouterRankingSkill(llm)
+    new OpenRouterRankingSkill(llm),
+    new StrategicResearchSkill()
   ];
   const runner = new TaskRunner(skills);
   const reporter =
@@ -69,6 +72,20 @@ async function main(): Promise<void> {
   }
   if (config.telegramTransport === "curl") {
     console.log("[boot] TELEGRAM_TRANSPORT=curl enabled.");
+  }
+
+  const heartbeatTarget =
+    Array.from(config.telegramAllowedChatIds)[0] || Array.from(config.telegramAllowedUserIds)[0] || "";
+  if (config.heartbeatEnabled && heartbeatTarget) {
+    const heartbeat = new HeartbeatService(telegram, reporter, {
+      intervalMs: config.heartbeatIntervalMs,
+      rootDir: process.cwd(),
+      targetChatId: heartbeatTarget
+    });
+    heartbeat.start();
+    console.log(`[boot] heartbeat enabled: interval=${config.heartbeatIntervalMs}ms target=${heartbeatTarget}`);
+  } else {
+    console.log("[boot] heartbeat disabled (missing target or HEARTBEAT_ENABLED=0).");
   }
   await gateway.start();
 }

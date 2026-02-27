@@ -1,4 +1,13 @@
-# News Editer Agent (MVP)
+# Product Overview
+
+本仓库当前包含两个并行、同级能力模块：
+
+1. **News Editer Agent (MVP)**：新闻采编与结构化总结
+2. **Strategic Research Crew (Spec v1.0)**：多镜头战略研究与情景推演
+
+二者共享同一套 Telegram/GitHub 基础设施，但处理流程与输出目标不同。
+
+## Feature A — News Editer Agent (MVP)
 
 面向“数字员工”场景的新闻采编 Agent。
 
@@ -21,6 +30,137 @@ Telegram(private chat)
 ```
 
 后续接入飞书时，只需要新增一个 `ChannelAdapter` 实现并接入 `Gateway`。
+
+## 两个 Feature 的流程差异（Mermaid）
+
+### Flow A: News Editer Agent（风格化）
+
+```mermaid
+flowchart TD
+    %% 样式定义
+    classDef ext fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#212529
+    classDef gw fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#0d47a1
+    classDef eng fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
+
+    %% 外部层
+    subgraph External["🌐 外部终端"]
+        TG["📱 Telegram"]:::ext
+        GH["🐙 GitHub"]:::ext
+    end
+
+    %% 入口层
+    subgraph Entry["🚪 入口与网关"]
+        GW["Gateway"]:::gw
+        Parser["TaskParser"]:::gw
+        TR["TaskRunner"]:::gw
+        Rep["GitHubReporter"]:::gw
+
+        GW --> Parser
+        Parser --> TR
+        TR --> Rep
+    end
+
+    %% 执行层
+    subgraph Engine["📰 News Skills"]
+        S1["Summarize Text/Link"]:::eng
+        S2["HN Digest"]:::eng
+        S3["OpenRouter Ranking"]:::eng
+
+        TR --> S1
+        TR --> S2
+        TR --> S3
+        S1 --> TR
+        S2 --> TR
+        S3 --> TR
+    end
+
+    %% 跨层连线
+    TG -->|"发送指令"| GW
+    Rep -->|"发布 Markdown"| GH
+    Rep -->|"回发链接"| TG
+```
+
+### Flow B: Strategic Research Crew（风格化）
+
+```mermaid
+flowchart TD
+    %% 样式定义
+    classDef ext fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,color:#212529
+    classDef gw fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#0d47a1
+    classDef eng fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#e65100
+    classDef ctx fill:#e8f5e9,stroke:#4caf50,stroke-width:2px,color:#1b5e20
+
+    %% 外部层
+    subgraph External["🌐 外部终端"]
+        TG["📱 Telegram"]:::ext
+        GH["🐙 GitHub"]:::ext
+    end
+
+    %% 主动层
+    subgraph Proactive["⏰ 主动服务"]
+        HB["Heartbeat Service"]
+        HBConf["读取 HEARTBEAT.md"]
+        Exec["内置执行器"]
+        HB --> HBConf
+        HB -->|"调度执行"| Exec
+    end
+
+    %% 入口层
+    subgraph Entry["🚪 入口与网关"]
+        GW["Gateway"]:::gw
+        Parser["TaskParser"]:::gw
+        TR["TaskRunner"]:::gw
+        Rep["GitHubReporter"]:::gw
+
+        GW --> Parser
+        Parser --> TR
+        TR --> Rep
+    end
+
+    %% 引擎层
+    subgraph Engine["🧠 核心引擎"]
+        S1["1. 信号摄入"]:::eng
+        S2["2. 视角选择"]:::eng
+        S3["3. 视角分析"]:::eng
+        S4["4. 辩证互评"]:::eng
+        S5["5. 综合摘要"]:::eng
+        S6["6. 编校合规"]:::eng
+
+        S1 --> S2
+        S2 --> S3
+        S3 --> S4
+        S4 --> S5
+        S5 --> S6
+    end
+
+    %% 配置与记忆
+    subgraph Context["💾 记忆与配置"]
+        Persona["Persona Profile"]:::ctx
+        Skill["Skill Template"]:::ctx
+        MemRun["运行时 Memory"]:::ctx
+        MemFile["文件化 Journal"]:::ctx
+    end
+
+    %% 跨层连线
+    TG -->|"发送指令"| GW
+    Exec -->|"生成主动任务"| TR
+    TR -->|"触发核心引擎"| S1
+    S6 -->|"返回报告段落"| TR
+    Rep -->|"发布Markdown"| GH
+    Rep -->|"回发链接"| TG
+
+    %% 外部上下文交互
+    Persona -.->|"配置注入"| S1
+    Skill -.->|"规则加载"| S1
+    S4 <-->|"状态读写"| MemRun
+    S6 -->|"持久化保存"| MemFile
+```
+
+### 关键差异总结
+
+- **News Editer Agent**：偏内容采编与总结（单任务/组合任务），输出以编辑报告为主。
+- **Strategic Research Crew**：偏状态机分析与情景推演，包含镜头分析、互评、记忆落盘与审校。
+- 两者都可发布到 GitHub，但 Strategic 输出是“战略结构化完整报告”，并写入长期记忆文件。
 
 ## 新增渠道（如飞书）
 
@@ -186,3 +326,170 @@ OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-cha
 - 发送纯净链接：`https://mp.weixin.qq.com/s/...`
 - 链接末尾即使带中文标点（如 `。`、`）`），系统也会自动清洗
 - 若仍失败，优先检查网络/代理是否可访问 `mp.weixin.qq.com`
+
+## Feature B — Strategic Research Crew (Spec v1.0)
+
+仓库已新增 `src/strategic/` 目录，实现基于状态机的多层战略研究引擎：
+
+- `Signal Intake`：信号结构化、打分与存储
+- `Lens Selection`：Theme→Lens 规则候选 + 动态收窄
+- `Parallel Lens Analysis`：多镜头并行分析（结构化输出）
+- `Dialectic`：单轮结构化互评（含置信度调整）
+- `Synthesis`：基准/替代情景与监控信号
+- `Editorial Governance`：一轮审校与一次修订控制
+- `Memory Stores`：Signal / Theme Cluster / Thesis / Lens Performance 四类存储
+- `Cadence`：daily / weekly / monthly 模式
+
+### 快速调用示例
+
+```ts
+import { StrategicResearchOrchestrator } from "./strategic/index.js";
+
+const orchestrator = new StrategicResearchOrchestrator({
+  cadence: "weekly",
+  phase: "phase4",
+  insufficientSignalThreshold: 0.4
+});
+
+const result = await orchestrator.run({
+  text: "某国发布新的先进芯片出口管制草案，相关供应链与资本市场快速波动。",
+  sourceType: "news"
+});
+```
+
+说明：
+
+- `phase1` 仅执行 Layer 1~3（Dialectic/Synthesis 使用 stub）
+- `phase2` 增加 Dialectic + Synthesis
+- `phase3` 增加 Editorial Governance + Memory Stores
+- `phase4` 增加 Cadence 控制（完整流）
+
+### How to Use it via TG
+
+发送以下格式即可触发战略研究流程：
+
+- `战略研究: weekly phase4 AI芯片出口限制影响全球供应链`
+- `战略: daily phase1 某平台发布新模型引发开发者迁移`
+- `strategy: monthly phase4 central bank policy shift and liquidity shock`
+
+参数说明：
+
+- cadence：`daily` / `weekly` / `monthly`（默认 `weekly`）
+- phase：`phase1` / `phase2` / `phase3` / `phase4`（默认 `phase4`）
+- 正文：其余文本会作为 signal 输入
+
+返回结果：
+
+- TG 短消息会返回 base/alternative/confidence 摘要
+- 若配置了 GitHub 报告发布，会附带完整结构化报告链接
+- 战略研究任务会生成“结构化完整报告”（TL;DR / 假设 / 证据推理 / Base&Alt / Watchlist / Next Actions / Machine Trace）并发布到 GitHub
+
+### Strategic Research Crew 个性化风格（SOUL / IDENTITY / USER）
+
+可在 OpenClaw workspace 目录放置以下文件来自定义战略研究回复风格：
+
+- `SOUL.md`：沟通风格与工作方式（如“直接切入主题”“允许表达观点”“简洁优先”）
+- `IDENTITY.md`：助手名称与符号标识
+- `USER.md`：用户称呼/时区/背景等偏好
+
+默认读取路径：`<项目根目录>/workspace`。
+也可通过环境变量指定：
+
+```env
+OPENCLAW_WORKSPACE=/path/to/openclaw/workspace
+```
+
+当你通过 TG 发送战略研究任务时（如 `战略研究: weekly phase4 ...`），系统会自动加载上述文件，并把风格应用到：
+
+- TG 短摘要语气（更直接/更简洁）
+- 报告中的叙事总结（Narrative Summary）
+- 是否附带“观点”段落（由 SOUL.md 规则控制）
+
+如果三个文件为空或不存在，会回退到默认中性风格。
+
+### Strategic Memory MVP（参考 OpenClaw）
+
+Strategic Research Crew 已接入一版文件型记忆系统（MVP），每次执行 `strategic_research` 都会写入：
+
+```text
+MEMORY.md
+memory/
+  ├── projects.md
+  ├── infra.md
+  ├── lessons.md
+  └── YYYY-MM-DD.md
+```
+
+说明：
+
+- `MEMORY.md`：核心索引，只保留最新关键信息与文件引用
+- `memory/projects.md`：按请求记录主题、镜头、状态与摘要
+- `memory/infra.md`：运行时快照（store 规模、更新时间）
+- `memory/lessons.md`：不确定性、监控信号、互评要点沉淀
+- `memory/YYYY-MM-DD.md`：按日完整执行日志
+
+默认写入项目根目录；可通过环境变量覆盖：
+
+```env
+STRATEGIC_MEMORY_DIR=/path/to/dir
+```
+
+### OpenClaw Skill Package（已抽离）
+
+`Strategic Research Crew` 的执行规范已按 OpenClaw 模版抽离到仓库目录：
+
+```text
+skills/
+  strategic-research/
+    SKILL.md
+    execute.sh
+    README.md
+```
+
+其中 `SKILL.md` 明确了：
+- 触发条件
+- 执行流程
+- 输出规范
+
+可通过脚本本地触发一次结构化运行（需先 `npm run build`）：
+
+```bash
+bash skills/strategic-research/execute.sh \
+  --text "AI芯片出口限制影响全球供应链" \
+  --cadence weekly \
+  --phase phase4
+```
+
+## Heartbeat（主动服务巡检）
+
+已新增 Heartbeat 机制：系统会按间隔触发巡检任务（默认每 30 分钟），并将结果发布为 GitHub 报告链接（若已配置 GitHub reporter），同时推送到允许列表中的一个 TG chat。
+
+### 如何启用规则
+
+在项目根目录创建 `HEARTBEAT.md`，例如：
+
+```markdown
+# HEARTBEAT.md
+
+## 每次心跳时执行
+- 检查核心服务健康状态(通过 HTTP 探测) https://example.com/health
+- 如果发现异常,立即通知但不要自动干预
+
+## 每日执行一次
+- 扫描项目待办列表,标记超过 3 天未更新的任务
+
+## 每周执行一次
+- 整理过去 7 天的对话日志,提炼关键信息到长期记忆
+```
+
+### 内置执行器（MVP）
+
+- 健康检查：识别条目中的 URL 或使用 `HEARTBEAT_HEALTH_URLS`
+- 每日待办扫描：扫描 `TODO.md` / `memory/projects.md` 中超过 3 天未更新项
+- 每周记忆整理：从 `memory/YYYY-MM-DD.md` 提炼并生成 `memory/weekly-YYYY-WW.md`
+
+### 配置项
+
+- `HEARTBEAT_ENABLED=1|0`（默认 `1`）
+- `HEARTBEAT_INTERVAL_MS`（默认 `1800000`）
+- `HEARTBEAT_HEALTH_URLS`（可选，逗号分隔）
