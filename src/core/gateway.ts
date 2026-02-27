@@ -69,7 +69,8 @@ export class Gateway {
           "2) 抓取 hn top 10 并分析",
           "3) 抓取 openrouter top 10 并分析",
           "4) 任务：总结 https://a.com + 抓取 hn top 10",
-          "5) 直接发送长文本，我会自动总结"
+          "5) 直接发送长文本，我会自动总结",
+          "6) 战略研究: weekly phase4 AI芯片出口限制影响（daily/weekly/monthly + phase1~4 可选）"
         ].join("\n")
       );
       return;

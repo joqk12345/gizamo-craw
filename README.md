@@ -186,3 +186,59 @@ OPENROUTER_FALLBACK_MODELS=qwen/qwen-2.5-72b-instruct:free,deepseek/deepseek-cha
 - 发送纯净链接：`https://mp.weixin.qq.com/s/...`
 - 链接末尾即使带中文标点（如 `。`、`）`），系统也会自动清洗
 - 若仍失败，优先检查网络/代理是否可访问 `mp.weixin.qq.com`
+
+## Strategic Research Crew (Spec v1.0)
+
+仓库已新增 `src/strategic/` 目录，实现基于状态机的多层战略研究引擎：
+
+- `Signal Intake`：信号结构化、打分与存储
+- `Lens Selection`：Theme→Lens 规则候选 + 动态收窄
+- `Parallel Lens Analysis`：多镜头并行分析（结构化输出）
+- `Dialectic`：单轮结构化互评（含置信度调整）
+- `Synthesis`：基准/替代情景与监控信号
+- `Editorial Governance`：一轮审校与一次修订控制
+- `Memory Stores`：Signal / Theme Cluster / Thesis / Lens Performance 四类存储
+- `Cadence`：daily / weekly / monthly 模式
+
+### 快速调用示例
+
+```ts
+import { StrategicResearchOrchestrator } from "./strategic/index.js";
+
+const orchestrator = new StrategicResearchOrchestrator({
+  cadence: "weekly",
+  phase: "phase4",
+  insufficientSignalThreshold: 0.4
+});
+
+const result = await orchestrator.run({
+  text: "某国发布新的先进芯片出口管制草案，相关供应链与资本市场快速波动。",
+  sourceType: "news"
+});
+```
+
+说明：
+
+- `phase1` 仅执行 Layer 1~3（Dialectic/Synthesis 使用 stub）
+- `phase2` 增加 Dialectic + Synthesis
+- `phase3` 增加 Editorial Governance + Memory Stores
+- `phase4` 增加 Cadence 控制（完整流）
+
+### How to Use it via TG
+
+发送以下格式即可触发战略研究流程：
+
+- `战略研究: weekly phase4 AI芯片出口限制影响全球供应链`
+- `战略: daily phase1 某平台发布新模型引发开发者迁移`
+- `strategy: monthly phase4 central bank policy shift and liquidity shock`
+
+参数说明：
+
+- cadence：`daily` / `weekly` / `monthly`（默认 `weekly`）
+- phase：`phase1` / `phase2` / `phase3` / `phase4`（默认 `phase4`）
+- 正文：其余文本会作为 signal 输入
+
+返回结果：
+
+- TG 短消息会返回 base/alternative/confidence 摘要
+- 若配置了 GitHub 报告发布，会附带完整结构化报告链接

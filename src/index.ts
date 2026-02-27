@@ -10,6 +10,7 @@ import { HackerNewsDigestSkill } from "./skills/hn-digest-skill.js";
 import { OpenRouterRankingSkill } from "./skills/openrouter-ranking-skill.js";
 import { SummarizeLinkSkill } from "./skills/summarize-link-skill.js";
 import { SummarizeTextSkill } from "./skills/summarize-text-skill.js";
+import { StrategicResearchSkill } from "./skills/strategic-research-skill.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -26,7 +27,8 @@ async function main(): Promise<void> {
     new SummarizeTextSkill(llm),
     new SummarizeLinkSkill(extractor, llm),
     new HackerNewsDigestSkill(llm),
-    new OpenRouterRankingSkill(llm)
+    new OpenRouterRankingSkill(llm),
+    new StrategicResearchSkill()
   ];
   const runner = new TaskRunner(skills);
   const reporter =
