@@ -36,14 +36,31 @@ export class OpenRouterLLM implements LLMClient {
     return unique;
   }
 
-  private isRegionBlockedError(err: unknown): boolean {
+  private isRetryableModelError(err: unknown): boolean {
     const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
-    return (
+    const isRegionBlocked =
       message.includes(" 403 ") &&
       (message.includes("region") ||
         message.includes("not allow in your region") ||
         message.includes("not available in your region") ||
-        message.includes("is not allowed in your region"))
+        message.includes("is not allowed in your region"));
+    const isRateLimited = message.includes(" 429 ");
+    const isServerBusy =
+      message.includes(" 5") &&
+      (message.includes(" 500 ") ||
+        message.includes(" 502 ") ||
+        message.includes(" 503 ") ||
+        message.includes(" 504 "));
+    const isNoEndpoint = message.includes("no endpoints found");
+    const isProviderTempUnavailable =
+      message.includes("provider returned error") &&
+      (message.includes("temporaril") || message.includes("unavailable"));
+    return (
+      isRegionBlocked ||
+      isRateLimited ||
+      isServerBusy ||
+      isNoEndpoint ||
+      isProviderTempUnavailable
     );
   }
 
@@ -90,7 +107,7 @@ export class OpenRouterLLM implements LLMClient {
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         errors.push(`${candidate}: ${detail.replace(/\s+/g, " ").slice(0, 180)}`);
-        const canTryNext = this.isRegionBlockedError(err);
+        const canTryNext = this.isRetryableModelError(err);
         if (!canTryNext || i === candidates.length - 1) {
           break;
         }
@@ -99,8 +116,8 @@ export class OpenRouterLLM implements LLMClient {
 
     throw new Error(
       [
-        "OpenRouter 调用失败：当前模型可能在你所在地区不可用。",
-        "请在 .env 调整 OPENROUTER_MODEL，或配置 OPENROUTER_FALLBACK_MODELS（逗号分隔）。",
+        "OpenRouter 调用失败：主模型当前不可用或受限（可能是地区限制、限流、路由不可用）。",
+        "请在 .env 调整 OPENROUTER_MODEL，并配置 OPENROUTER_FALLBACK_MODELS（逗号分隔）。",
         `尝试记录：${errors.join(" | ")}`
       ].join(" ")
     );
