@@ -18,6 +18,35 @@ function detectTopN(text: string, defaultValue: number): number {
   return Math.max(1, Math.min(30, n));
 }
 
+
+function parseStrategicResearchTask(source: string): ParsedTask | null {
+  const m = source.match(/^(战略研究|战略|strategy|strategic)\s*[:：]?\s*(.*)$/i);
+  if (!m) return null;
+  const body = (m[2] || "").trim();
+  if (!body) return null;
+
+  const cadenceMatch = body.match(/\b(daily|weekly|monthly)\b/i);
+  const phaseMatch = body.match(/\bphase\s*([1-4])\b/i);
+  const cadence = (cadenceMatch?.[1]?.toLowerCase() || "weekly") as "daily" | "weekly" | "monthly";
+  const phase = (`phase${phaseMatch?.[1] || "4"}`) as "phase1" | "phase2" | "phase3" | "phase4";
+  const cleaned = body
+    .replace(/\b(daily|weekly|monthly)\b/gi, " ")
+    .replace(/\bphase\s*[1-4]\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return {
+    kind: "strategic_research",
+    title: "战略研究",
+    payload: {
+      text: cleaned,
+      sourceType: "telegram",
+      cadence,
+      phase
+    }
+  };
+}
+
 function stripControlText(input: string): string {
   return input
     .replace(URL_RE, " ")
@@ -37,6 +66,11 @@ export function parseTasks(text: string): ParsedTask[] {
   }
   if (/^(总结|summary|summarize|抓取|分析|任务[:：]?)\s*$/i.test(source)) {
     return [];
+  }
+
+  const strategicTask = parseStrategicResearchTask(source);
+  if (strategicTask) {
+    return [strategicTask];
   }
 
   const tasks: ParsedTask[] = [];

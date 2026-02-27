@@ -9,7 +9,12 @@ export interface IncomingMessage {
 }
 
 export interface ParsedTask {
-  kind: "summarize_text" | "summarize_link" | "hn_digest" | "openrouter_ranking";
+  kind:
+    | "summarize_text"
+    | "summarize_link"
+    | "hn_digest"
+    | "openrouter_ranking"
+    | "strategic_research";
   title: string;
   payload: Record<string, unknown>;
 }
@@ -23,4 +28,3 @@ export interface SkillResult {
 export interface TaskContext {
   requestId: string;
 }
-

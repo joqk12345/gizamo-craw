@@ -16,7 +16,10 @@ export interface AppConfig {
   githubBranch: string;
   pollIntervalMs: number;
   reportBasePath: string;
+  heartbeatEnabled: boolean;
+  heartbeatIntervalMs: number;
 }
+
 
 function firstEnv(...keys: string[]): string | undefined {
   for (const key of keys) {
@@ -146,6 +149,8 @@ export function loadConfig(): AppConfig {
     pollIntervalMs: Number(process.env.POLL_INTERVAL_MS || "1500"),
     reportBasePath:
       firstEnv("REPORT_BASE_PATH", "report_BASE_PATH", "report_base_path") ||
-      "reports"
+      "reports",
+    heartbeatEnabled: toBool(process.env.HEARTBEAT_ENABLED, true),
+    heartbeatIntervalMs: Number(process.env.HEARTBEAT_INTERVAL_MS || "1800000")
   };
 }
