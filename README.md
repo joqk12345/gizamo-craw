@@ -13,8 +13,9 @@
 
 当前版本目标：
 - 私聊 Telegram 下发任务
-- 支持链接总结、长文本总结、Hacker News 分析、OpenRouter 综合热度分析
+- 支持链接总结、长文本总结、原文中英重写、Hacker News 分析、OpenRouter 综合热度分析
 - 总结任务支持固定“结构化文档模板”（标题、概念、关系、FAQ、Mermaid、金句等）
+- 任务执行会自动写入 `memory/YYYY-MM-DD.md`（含 requestId、任务类型、成功/失败状态）
 - 任务执行完后，Telegram 返回短摘要 + GitHub 详细报告链接
   - 若未配置 GitHub，则仅返回 TG 短摘要
 
@@ -24,7 +25,7 @@
 Telegram(private chat)
   -> Gateway (allowlist + queue + task parsing)
   -> TaskRunner
-      -> Skills (summarize_text / summarize_link / hn_digest / openrouter_ranking)
+      -> Skills (rewrite_bilingual / summarize_text / summarize_link / hn_digest / openrouter_ranking)
   -> GitHubReporter (markdown report)
   -> Telegram short reply + report link
 ```
@@ -262,13 +263,16 @@ npm run dev
 
 按租户运行后，命令按租户角色严格隔离：
 
-- `<TENANT>_AGENT_ROLE=news`：该租户只接受新闻采编命令（总结链接/文本、HN、OpenRouter）
+- `<TENANT>_AGENT_ROLE=news`：该租户只接受新闻采编命令（总结链接/文本、中英重写、HN、OpenRouter）
 - `<TENANT>_AGENT_ROLE=strategic`：该租户只接受 `战略研究/战略/strategy` 命令
 
 - 链接总结
   - `总结 https://example.com/article`
 - 长文本总结
   - 直接发一段长文本给 Bot
+- 原文中英重写
+  - `重写 这里放原文`
+  - `改写这段原文，用中英各写一版：...`
 - Hacker News
   - `抓取 hn top 10 并分析`
 - OpenRouter

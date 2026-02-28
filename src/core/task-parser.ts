@@ -61,6 +61,19 @@ function stripControlText(input: string): string {
     .trim();
 }
 
+function stripRewriteControlText(input: string): string {
+  return input
+    .replace(URL_RE, " ")
+    .replace(/任务[:：]?/gi, " ")
+    .replace(/请|帮我|麻烦|一下/gi, " ")
+    .replace(/原文/gi, " ")
+    .replace(/用中英|中英|中英文|双语|中文和英文|中文与英文/gi, " ")
+    .replace(/重写|改写|rewrite|paraphrase/gi, " ")
+    .replace(/[+,，;；]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function parseTasks(text: string, mode: TaskParserMode = "news"): ParsedTask[] {
   const source = text.trim();
   if (!source) {
@@ -79,6 +92,19 @@ export function parseTasks(text: string, mode: TaskParserMode = "news"): ParsedT
   }
 
   const tasks: ParsedTask[] = [];
+  const wantsRewrite = /(重写|改写|rewrite|paraphrase)/i.test(source);
+  if (wantsRewrite) {
+    const rewriteText = stripRewriteControlText(source) || source;
+    if (rewriteText.length > 0) {
+      tasks.push({
+        kind: "rewrite_bilingual",
+        title: "原文中英重写",
+        payload: { text: rewriteText }
+      });
+      return tasks;
+    }
+  }
+
   const links = Array.from(
     new Set((source.match(URL_RE) || []).map((v) => normalizeDetectedUrl(v)).filter(Boolean))
   );

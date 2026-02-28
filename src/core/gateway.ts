@@ -1,11 +1,13 @@
 import { ChannelAdapter } from "../channels/channel-adapter.js";
 import { Reporter } from "../services/reporter.js";
+import { RuntimeMemoryJournal } from "../services/runtime-memory-journal.js";
 import { parseTasks, TaskParserMode } from "./task-parser.js";
 import { TaskRunner } from "./task-runner.js";
 import { IncomingMessage } from "./types.js";
 
 interface GatewayOptions {
   agentRole: TaskParserMode;
+  agentLabel?: string;
   allowedUserIds: Set<string>;
   allowedChatIds: Set<string>;
   runner: TaskRunner;
@@ -14,6 +16,7 @@ interface GatewayOptions {
 
 export class Gateway {
   private queue: Promise<void> = Promise.resolve();
+  private readonly runtimeJournal = new RuntimeMemoryJournal();
 
   constructor(
     private readonly channel: ChannelAdapter,
@@ -35,7 +38,8 @@ export class Gateway {
       "2) 抓取 hn top 10 并分析",
       "3) 抓取 openrouter top 10 并分析",
       "4) 任务：总结 https://a.com + 抓取 hn top 10",
-      "5) 直接发送长文本，我会自动总结"
+      "5) 重写 这里放原文（我会输出中文重写 + English Rewrite）",
+      "6) 直接发送长文本，我会自动总结"
     ];
   }
 
@@ -107,6 +111,14 @@ export class Gateway {
       const runOutput = await this.options.runner.run(requestId, tasks, async (progress) => {
         await this.channel.sendMessage(message.chatId, progress);
       });
+      this.runtimeJournal.appendRuntimeRecord({
+        requestId,
+        agentLabel: this.options.agentLabel || this.options.agentRole,
+        actorId: message.actorId,
+        chatId: message.chatId,
+        status: "success",
+        tasks
+      });
       let reportUrl = "";
       let publishHint = "";
       try {
@@ -129,6 +141,15 @@ export class Gateway {
       );
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
+      this.runtimeJournal.appendRuntimeRecord({
+        requestId,
+        agentLabel: this.options.agentLabel || this.options.agentRole,
+        actorId: message.actorId,
+        chatId: message.chatId,
+        status: "failed",
+        tasks,
+        errorMessage: detail.replace(/\s+/g, " ").slice(0, 220)
+      });
       await this.channel.sendMessage(message.chatId, `任务失败(${requestId}): ${detail}`);
     }
   }

@@ -10,7 +10,9 @@ import { HeartbeatService } from "./services/heartbeat.js";
 import { HackerNewsDigestSkill } from "./skills/hn-digest-skill.js";
 import { OpenRouterRankingSkill } from "./skills/openrouter-ranking-skill.js";
 import { loadPersonaProfile } from "./services/persona-profile.js";
+import { PersonaAwareLLM } from "./services/persona-llm.js";
 import { SummarizeLinkSkill } from "./skills/summarize-link-skill.js";
+import { RewriteBilingualSkill } from "./skills/rewrite-bilingual-skill.js";
 import { SummarizeTextSkill } from "./skills/summarize-text-skill.js";
 import { StrategicResearchSkill } from "./skills/strategic-research-skill.js";
 import { AgentRole, TenantConfig } from "./config.js";
@@ -21,13 +23,13 @@ function buildSkills(
   extractor: ContentExtractor
 ) {
   const role: AgentRole = tenant.agentRole;
+  const persona = loadPersonaProfile({
+    workspaceDir: tenant.personaWorkspaceDir,
+    soulPath: tenant.soulFile,
+    identityPath: tenant.identityFile,
+    userPath: tenant.userFile
+  });
   if (role === "strategic") {
-    const persona = loadPersonaProfile({
-      workspaceDir: tenant.personaWorkspaceDir,
-      soulPath: tenant.soulFile,
-      identityPath: tenant.identityFile,
-      userPath: tenant.userFile
-    });
     return [
       new StrategicResearchSkill(
         persona,
@@ -36,11 +38,13 @@ function buildSkills(
       )
     ];
   }
+  const personaLLM = new PersonaAwareLLM(llm, persona.soul);
   return [
-    new SummarizeTextSkill(llm),
-    new SummarizeLinkSkill(extractor, llm),
-    new HackerNewsDigestSkill(llm),
-    new OpenRouterRankingSkill(llm)
+    new RewriteBilingualSkill(personaLLM),
+    new SummarizeTextSkill(personaLLM),
+    new SummarizeLinkSkill(extractor, personaLLM),
+    new HackerNewsDigestSkill(personaLLM),
+    new OpenRouterRankingSkill(personaLLM)
   ];
 }
 
@@ -95,6 +99,7 @@ async function main(): Promise<void> {
     );
     const gateway = new Gateway(telegram, {
       agentRole: tenant.agentRole,
+      agentLabel: `${tenant.id}/${tenant.agentRole}`,
       allowedUserIds: tenant.telegramAllowedUserIds,
       allowedChatIds: tenant.telegramAllowedChatIds,
       runner,

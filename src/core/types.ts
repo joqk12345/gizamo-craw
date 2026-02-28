@@ -11,6 +11,7 @@ export interface IncomingMessage {
 export interface ParsedTask {
   kind:
     | "summarize_text"
+    | "rewrite_bilingual"
     | "summarize_link"
     | "hn_digest"
     | "openrouter_ranking"
