@@ -10,6 +10,7 @@ interface RuntimeMemoryRecord {
   status: "success" | "failed";
   tasks: ParsedTask[];
   errorMessage?: string;
+  traceLines?: string[];
 }
 
 function readIfExists(file: string): string {
@@ -55,6 +56,7 @@ export class RuntimeMemoryJournal {
       `- tasks: ${taskKinds || "none"}`,
       `- titles: ${taskTitles || "none"}`,
       `- result: ${outcome}${input.errorMessage ? `（${input.errorMessage}）` : ""}`,
+      ...(input.traceLines || []).map((line) => `- trace: ${line}`),
       ""
     ]);
   }

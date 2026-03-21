@@ -11,6 +11,10 @@ import { HackerNewsDigestSkill } from "./skills/hn-digest-skill.js";
 import { OpenRouterRankingSkill } from "./skills/openrouter-ranking-skill.js";
 import { loadPersonaProfile } from "./services/persona-profile.js";
 import { PersonaAwareLLM } from "./services/persona-llm.js";
+import {
+  DisabledStructuredSummaryGenerator,
+  OpenRouterStructuredSummaryGenerator
+} from "./services/structured-summary-generator.js";
 import { SummarizeLinkSkill } from "./skills/summarize-link-skill.js";
 import { RewriteBilingualSkill } from "./skills/rewrite-bilingual-skill.js";
 import { SummarizeTextSkill } from "./skills/summarize-text-skill.js";
@@ -20,7 +24,12 @@ import { AgentRole, TenantConfig } from "./config.js";
 function buildSkills(
   tenant: TenantConfig,
   llm: OpenRouterLLM | DisabledLLM,
-  extractor: ContentExtractor
+  extractor: ContentExtractor,
+  summaryGeneratorOptions: {
+    apiKey?: string;
+    model: string;
+    fallbackModels: string[];
+  }
 ) {
   const role: AgentRole = tenant.agentRole;
   const persona = loadPersonaProfile({
@@ -39,10 +48,18 @@ function buildSkills(
     ];
   }
   const personaLLM = new PersonaAwareLLM(llm, persona.soul);
+  const summaryGenerator = summaryGeneratorOptions.apiKey
+    ? new OpenRouterStructuredSummaryGenerator(
+        summaryGeneratorOptions.apiKey,
+        summaryGeneratorOptions.model,
+        summaryGeneratorOptions.fallbackModels,
+        persona.soul
+      )
+    : new DisabledStructuredSummaryGenerator();
   return [
     new RewriteBilingualSkill(personaLLM),
-    new SummarizeTextSkill(personaLLM),
-    new SummarizeLinkSkill(extractor, personaLLM),
+    new SummarizeTextSkill(summaryGenerator),
+    new SummarizeLinkSkill(extractor, summaryGenerator),
     new HackerNewsDigestSkill(personaLLM),
     new OpenRouterRankingSkill(personaLLM)
   ];
@@ -77,7 +94,11 @@ async function main(): Promise<void> {
   }
 
   const starts = config.tenants.map(async (tenant) => {
-    const skills = buildSkills(tenant, llm, extractor);
+    const skills = buildSkills(tenant, llm, extractor, {
+      apiKey: config.openRouterApiKey,
+      model: config.openRouterModel,
+      fallbackModels: config.openRouterFallbackModels
+    });
     const runner = new TaskRunner(skills, {
       agentLabel: `${tenant.id}/${tenant.agentRole}`
     });

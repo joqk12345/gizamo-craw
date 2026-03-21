@@ -27,11 +27,18 @@ export class OpenRouterLLM implements LLMClient {
   private modelCandidates(): string[] {
     const all = [this.activeModel, this.model, ...this.fallbackModels];
     const unique: string[] = [];
+    let sawNonFree = false;
     for (const m of all) {
       const key = (m || "").trim();
       if (key && !unique.includes(key)) {
         unique.push(key);
+        if (!key.endsWith(":free") && key !== "openrouter/free") {
+          sawNonFree = true;
+        }
       }
+    }
+    if (!sawNonFree && !unique.includes("openrouter/free")) {
+      unique.push("openrouter/free");
     }
     return unique;
   }
@@ -52,15 +59,13 @@ export class OpenRouterLLM implements LLMClient {
         message.includes(" 503 ") ||
         message.includes(" 504 "));
     const isNoEndpoint = message.includes("no endpoints found");
-    const isProviderTempUnavailable =
-      message.includes("provider returned error") &&
-      (message.includes("temporaril") || message.includes("unavailable"));
+    const isProviderReturnedError = message.includes("provider returned error");
     return (
       isRegionBlocked ||
       isRateLimited ||
       isServerBusy ||
       isNoEndpoint ||
-      isProviderTempUnavailable
+      isProviderReturnedError
     );
   }
 

@@ -117,7 +117,8 @@ export class Gateway {
         actorId: message.actorId,
         chatId: message.chatId,
         status: "success",
-        tasks
+        tasks,
+        traceLines: runOutput.traceLines
       });
       let reportUrl = "";
       let publishHint = "";
@@ -148,6 +149,7 @@ export class Gateway {
         chatId: message.chatId,
         status: "failed",
         tasks,
+        traceLines: [],
         errorMessage: detail.replace(/\s+/g, " ").slice(0, 220)
       });
       await this.channel.sendMessage(message.chatId, `任务失败(${requestId}): ${detail}`);

@@ -5,6 +5,7 @@ export interface RunOutput {
   shortMessage: string;
   markdownReport: string;
   title: string;
+  traceLines: string[];
 }
 
 interface TaskRunnerOptions {
@@ -46,6 +47,7 @@ export class TaskRunner {
     const topLines = results
       .map((r, i) => `${i + 1}. ${r.shortSummary.replace(/\n+/g, " ").slice(0, 120)}`)
       .join("\n");
+    const traceLines = results.flatMap((r) => r.traceLines || []);
     const shortMessage = `[${this.agentLabel}] 任务完成，共 ${results.length} 项。\n${topLines}`;
     const markdownReport = [
       `# ${this.agentLabel.toUpperCase()} 任务报告`,
@@ -54,6 +56,13 @@ export class TaskRunner {
       `- requestId: ${requestId}`,
       `- 生成时间(UTC): ${new Date().toISOString()}`,
       ``,
+      ...(traceLines.length
+        ? [
+            `### Runtime Trace`,
+            ...traceLines.map((line) => `- ${line}`),
+            ``
+          ]
+        : []),
       ...results.map((r) => r.reportSection),
       ``
     ].join("\n");
@@ -61,7 +70,8 @@ export class TaskRunner {
     return {
       shortMessage,
       markdownReport,
-      title: `${this.agentLabel}-task-${requestId}`
+      title: `${this.agentLabel}-task-${requestId}`,
+      traceLines
     };
   }
 }

@@ -51,3 +51,16 @@
 - selected_lenses: MarketStructureLens, PolicyRiskLens, ExecutionLens, AdoptionLens, CapitalFlowLens
 - status: publish
 - summary: Stub base case from MarketStructureLens
+
+## 2026-03-21 | news-editer
+- status: active
+- change: `summarize_text` / `summarize_link` 改为 AI SDK 结构化输出链路，模型只产 JSON，Markdown 与 Mermaid 由代码渲染
+- scope: 新增 schema、renderer、OpenRouter structured summary generator；保留 Gateway / TaskRunner / Telegram 主干不变
+- validation: 已执行 `npm install` 与 `npm run build`
+
+## 2026-03-22 | news-editer
+- status: active
+- change: summary 结构化链路新增双重回退；`provider returned error` 视为可切换模型错误，`json_schema` 不兼容时自动降级到普通 completion + 本地 JSON 校验
+- fallback: 当配置全部为 `:free` 模型时，自动追加 `openrouter/free` 作为最终兜底路由
+- validation: 本地构建通过；2026-03-22 的 live smoke test 已确认旧报错不再卡在首个模型，但 OpenRouter 免费路由当时响应较慢/不稳定
+- observability: summary 报告头与 runtime 日志现在会记录实际命中的模型、是否触发 schema fallback、完整 attempted_models 链

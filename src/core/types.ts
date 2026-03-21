@@ -24,6 +24,7 @@ export interface SkillResult {
   title: string;
   shortSummary: string;
   reportSection: string;
+  traceLines?: string[];
 }
 
 export interface TaskContext {
